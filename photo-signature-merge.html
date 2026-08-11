@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo + Signature Merge</title>
+<style>
+  :root{
+    --ink:#1e3a5f;
+    --ink-soft:#33587f;
+    --paper:#f7f8fa;
+    --card:#ffffff;
+    --line:#c7d2df;
+    --accent:#2f9e91;
+    --accent-dark:#1f6b62;
+    --shadow: 0 1px 2px rgba(30,58,95,0.06), 0 8px 24px rgba(30,58,95,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height:100vh;
+    padding: 28px 16px 60px;
+  }
+  .wrap{ max-width: 900px; margin: 0 auto; }
+  h1{
+    font-size: 1.35rem;
+    letter-spacing: 0.02em;
+    margin: 0 0 4px;
+    color: var(--ink);
+  }
+  .sub{
+    color: var(--ink-soft);
+    font-size: 0.92rem;
+    margin: 0 0 24px;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 720px){
+    .grid{ grid-template-columns: 1fr; }
+  }
+  .panel{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .panel h2{
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    margin: 0 0 12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel h2 .num{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:20px;height:20px;
+    border-radius:50%;
+    background: var(--accent);
+    color:#fff;
+    font-size:0.7rem;
+    font-weight:700;
+  }
+  .drop{
+    border: 2px dashed var(--line);
+    border-radius: 8px;
+    padding: 18px;
+    text-align:center;
+    cursor:pointer;
+    transition: border-color .15s, background .15s;
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+    display:block;
+  }
+  .drop:hover, .drop.drag{
+    border-color: var(--accent);
+    background: #f0faf8;
+  }
+  .drop input{ display:none; }
+  #photoPreview, #sigPreview{
+    margin-top:12px;
+    max-width:100%;
+    max-height:220px;
+    display:none;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:#fff;
+  }
+  .actions-row{
+    margin-top: 24px;
+    display:flex;
+    gap:12px;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  button{
+    font-family:inherit;
+    font-size:0.85rem;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:#fff;
+    color: var(--ink);
+    padding:7px 14px;
+    cursor:pointer;
+  }
+  .btn-primary{
+    background: var(--accent);
+    border-color: var(--accent);
+    color:#fff;
+    font-weight:600;
+    padding:10px 22px;
+  }
+  .btn-primary:hover{ background: var(--accent-dark); border-color: var(--accent-dark); color:#fff; }
+  .btn-primary:disabled{
+    background:#b9c3cd; border-color:#b9c3cd; cursor:not-allowed;
+  }
+  .result{
+    margin-top: 28px;
+    text-align:center;
+    display:none;
+  }
+  .result h2{
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    margin-bottom:12px;
+  }
+  #outputCanvas{
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+  }
+  .download-link{
+    display:inline-block;
+    margin-top:16px;
+    background: var(--ink);
+    color:#fff;
+    text-decoration:none;
+    padding:10px 20px;
+    border-radius:6px;
+    font-size:0.9rem;
+    font-weight:600;
+  }
+  .download-link:hover{ background: var(--ink-soft); }
+  .hint{ font-size:0.78rem; color:#8896a6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Photo + Signature Merge</h1>
+  <p class="sub">Upload a photo and a signature image, then merge them into a bordered document box as a JPEG, compressed to under 25KB.</p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2><span class="num">1</span>Photo</h2>
+      <label class="drop" id="dropZone">
+        <input type="file" id="photoInput" accept="image/*">
+        <span id="dropText">Tap to choose a photo, or drag one here</span>
+      </label>
+      <img id="photoPreview" alt="photo preview">
+    </div>
+
+    <div class="panel">
+      <h2><span class="num">2</span>Signature</h2>
+      <label class="drop" id="sigDropZone">
+        <input type="file" id="sigInput" accept="image/*">
+        <span id="sigDropText">Tap to choose a signature image, or drag one here</span>
+      </label>
+      <img id="sigPreview" alt="signature preview">
+    </div>
+  </div>
+
+  <div class="actions-row">
+    <button class="btn-primary" id="mergeBtn" disabled>Create merged JPEG</button>
+  </div>
+
+  <div class="result" id="resultBlock">
+    <h2>Merged Result</h2>
+    <canvas id="outputCanvas"></canvas>
+    <br>
+    <a class="download-link" id="downloadLink" download="photo-signature.jpg">Download JPEG</a>
+    <p class="hint" id="sizeNote" style="margin-top:8px;"></p>
+  </div>
+</div>
+
+<footer style="text-align:center; margin-top:40px; font-size:0.78rem; color:#8896a6;">
+  Made by M Shan
+</footer>
+
+<script>
+  // ---------- Generic file loader ----------
+  function loadImageFile(file, onLoaded){
+    if(!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => onLoaded(img, e.target.result);
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function wireDropZone(zoneEl, inputEl, onFile){
+    inputEl.addEventListener('change', (e) => onFile(e.target.files[0]));
+    ['dragenter','dragover'].forEach(evt =>
+      zoneEl.addEventListener(evt, (e) => { e.preventDefault(); zoneEl.classList.add('drag'); })
+    );
+    ['dragleave','drop'].forEach(evt =>
+      zoneEl.addEventListener(evt, (e) => { e.preventDefault(); zoneEl.classList.remove('drag'); })
+    );
+    zoneEl.addEventListener('drop', (e) => {
+      const file = e.dataTransfer.files[0];
+      if(file) onFile(file);
+    });
+  }
+
+  // ---------- Photo upload ----------
+  let uploadedImage = null;
+  const dropZone = document.getElementById('dropZone');
+  const dropText = document.getElementById('dropText');
+  const photoPreview = document.getElementById('photoPreview');
+
+  wireDropZone(dropZone, document.getElementById('photoInput'), (file) => {
+    loadImageFile(file, (img, dataUrl) => {
+      uploadedImage = img;
+      photoPreview.src = dataUrl;
+      photoPreview.style.display = 'block';
+      dropText.textContent = file.name;
+      updateMergeButton();
+    });
+  });
+
+  // ---------- Signature upload ----------
+  let uploadedSigImage = null;
+  const sigDropZone = document.getElementById('sigDropZone');
+  const sigDropText = document.getElementById('sigDropText');
+  const sigPreview = document.getElementById('sigPreview');
+
+  wireDropZone(sigDropZone, document.getElementById('sigInput'), (file) => {
+    loadImageFile(file, (img, dataUrl) => {
+      uploadedSigImage = img;
+      sigPreview.src = dataUrl;
+      sigPreview.style.display = 'block';
+      sigDropText.textContent = file.name;
+      updateMergeButton();
+    });
+  });
+
+  // ---------- Merge button state ----------
+  const mergeBtn = document.getElementById('mergeBtn');
+  function updateMergeButton(){
+    mergeBtn.disabled = !(uploadedImage && uploadedSigImage);
+  }
+
+  // ---------- Merge into layout ----------
+  mergeBtn.addEventListener('click', () => {
+    const outW = 500;
+    const photoH = 560;
+    const sigH = 160;
+    const border = 2;
+    const padding = 14;
+
+    const outCanvas = document.getElementById('outputCanvas');
+    outCanvas.width = outW;
+    outCanvas.height = photoH + sigH;
+    const ctx = outCanvas.getContext('2d');
+
+    // white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,outW, photoH + sigH);
+
+    // outer border box
+    ctx.strokeStyle = '#1e3a5f';
+    ctx.lineWidth = border;
+    ctx.strokeRect(border, border, outW - border*2, photoH + sigH - border*2);
+
+    // divider line between photo and signature section
+    ctx.beginPath();
+    ctx.moveTo(border, photoH);
+    ctx.lineTo(outW - border, photoH);
+    ctx.stroke();
+
+    // draw photo, contained within top box (cover-fit, centered)
+    const boxW = outW - padding*2;
+    const boxH = photoH - padding*2;
+    const imgRatio = uploadedImage.width / uploadedImage.height;
+    const boxRatio = boxW / boxH;
+    let sx, sy, sw, sh;
+    if(imgRatio > boxRatio){
+      sh = uploadedImage.height;
+      sw = sh * boxRatio;
+      sx = (uploadedImage.width - sw) / 2;
+      sy = 0;
+    } else {
+      sw = uploadedImage.width;
+      sh = sw / boxRatio;
+      sx = 0;
+      sy = (uploadedImage.height - sh) / 2;
+    }
+    ctx.drawImage(uploadedImage, sx, sy, sw, sh, padding, padding, boxW, boxH);
+
+    // draw uploaded signature image in bottom box (contain-fit, centered)
+    const sigTargetW = outW - padding*2;
+    const sigTargetH = sigH - padding*2;
+    const sigImgRatio = uploadedSigImage.width / uploadedSigImage.height;
+    const sigBoxRatio = sigTargetW / sigTargetH;
+    let dw, dh;
+    if(sigImgRatio > sigBoxRatio){
+      dw = sigTargetW;
+      dh = dw / sigImgRatio;
+    } else {
+      dh = sigTargetH;
+      dw = dh * sigImgRatio;
+    }
+    const dx = padding + (sigTargetW - dw)/2;
+    const dy = photoH + padding + (sigTargetH - dh)/2;
+    ctx.drawImage(uploadedSigImage, dx, dy, dw, dh);
+
+    // show result
+    document.getElementById('resultBlock').style.display = 'block';
+
+    // compress to under 25KB by stepping down JPEG quality, then canvas size if needed
+    compressToTarget(outCanvas, 25 * 1024).then((blob) => {
+      const link = document.getElementById('downloadLink');
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      const sizeKb = (blob.size / 1024).toFixed(1);
+      document.getElementById('sizeNote').textContent = `File size: ${sizeKb} KB`;
+    });
+
+    document.getElementById('resultBlock').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+  function canvasToBlob(canvas, quality){
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
+    });
+  }
+
+  async function compressToTarget(sourceCanvas, targetBytes){
+    // Step 1: reduce quality at full size
+    let quality = 0.92;
+    let blob = await canvasToBlob(sourceCanvas, quality);
+    while(blob.size > targetBytes && quality > 0.1){
+      quality -= 0.08;
+      blob = await canvasToBlob(sourceCanvas, quality);
+    }
+    if(blob.size <= targetBytes) return blob;
+
+    // Step 2: still too big — shrink pixel dimensions and retry at moderate quality
+    let scale = 0.85;
+    let workCanvas = sourceCanvas;
+    while(blob.size > targetBytes && scale > 0.2){
+      const w = Math.max(1, Math.round(sourceCanvas.width * scale));
+      const h = Math.max(1, Math.round(sourceCanvas.height * scale));
+      const tmp = document.createElement('canvas');
+      tmp.width = w;
+      tmp.height = h;
+      const tctx = tmp.getContext('2d');
+      tctx.drawImage(sourceCanvas, 0, 0, w, h);
+      workCanvas = tmp;
+
+      quality = 0.85;
+      blob = await canvasToBlob(workCanvas, quality);
+      while(blob.size > targetBytes && quality > 0.1){
+        quality -= 0.08;
+        blob = await canvasToBlob(workCanvas, quality);
+      }
+      scale -= 0.1;
+    }
+    return blob;
+  }
+</script>
+</body>
+</html>
